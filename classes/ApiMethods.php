@@ -1,3 +1,4 @@
+<?php
 use GuzzleHttp\Client;
 
 class APIHelper {
