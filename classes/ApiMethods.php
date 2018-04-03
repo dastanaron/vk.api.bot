@@ -1,139 +1,91 @@
-<?php
+use GuzzleHttp\Client;
 
-class ApiMethods{
+class APIHelper {
 
-    protected $usertocken = 0;
-    protected $api = 'https://api.vk.com/method/';
-    protected $error;
+    protected $url = 'https://api.vk.com/method/';
 
-    function __construct($usertocken)
+    public $query;
+
+    protected $token;
+
+    public function __construct($APIKey)
     {
-        $this->usertocken = $usertocken;
+        $this->token = $APIKey;
+        $this->query = $this->url;
     }
 
-    /*
-     * Сюда методы из АПИ ВК
-     */
+    public static function init($APIKey)
+    {
+        return new self($APIKey);
+    }
+
     public function getProfileInfo()
     {
-        $this->api .= 'account.getProfileInfo';
+        $this->query .= 'account.getProfileInfo';
         return $this;
     }
 
     public function AccountSetOnline()
     {
-        $this->api .= 'account.setOnline?voip=0';
+        $this->query .= 'account.setOnline?voip=0';
         return $this;
     }
 
-    public function SendMessageUser($userid, $message)
+    public function SendMessageUser($userId, $message, $repeatFlag=false)
     {
-        $random_id = crc32($userid .$message);
-        $this->api .= 'messages.send?user_id='.$userid.'&peer_id='.$userid.'&message='.urlencode($message).''; //&random_id='.$random_id.'
+        $random_id = crc32($userId .$message);
+        $query = 'messages.send?user_id='.$userId.'&peer_id='.$userId.'&message='.urlencode($message);
+
+        if($repeatFlag) {
+            $query .= '&random_id='.$random_id;
+        }
+
+        $this->query .= $query;
         return $this;
-    }
-
-    public function APIExecute($response = true)
-    {
-        if ($this->addAccessTocken() && $this->addVersionApi()) {
-
-            if ($response) {
-                return $this->CURLExec();
-            }
-            else {
-                return json_decode($this->CURLExec(), true);
-            }
-            //return $this->api;
-        }
-        else {
-            $this->error = 'Ошибка запроса не добавлены обязательные свойства запроса';
-            return false;
-        }
     }
 
     public function getMessage($time_offset = 60)
     {
-        $this->api .= 'messages.get?time_offset='.$time_offset.'';
+        $this->query .= 'messages.get?time_offset='.$time_offset;
         return $this;
     }
 
     public function getUsers($users_id)
     {
-        $this->api .= 'users.get?user_ids='.$users_id.'';
+        $this->query .= 'users.get?user_ids='.$users_id;
         return $this;
     }
 
-    /*
-     * Сервисные функции для обязательных полей запроса
-     */
-    protected function addAccessTocken()
+    public function setVersion($version='5.74')
     {
-        if (preg_match('#method/(.+)#', $this->api)){
+        return 'v='.$version;
+    }
 
-            if (preg_match('#\?#', $this->api)) {
-                $this->api .= '&access_token='.$this->usertocken;
-            }
-            else {
-                $this->api .= '?access_token='.$this->usertocken;
-            }
-            return true;
-
+    public function setAccessToken($token=null)
+    {
+        if(!empty($token)) {
+            $this->token = $token;
         }
-        else {
-            $this->error = 'Ошибка не вызван ни один метод апи';
-            return false;
-        }
-    }
-
-    protected function addVersionApi()
-    {
-        $this->api .= '&v=5.64';
-        return true;
-    }
-
-    protected function CURLExec()
-    {
-
-        $curl = curl_init();
-
-        curl_setopt_array($curl, array(
-            CURLOPT_URL => $this->api,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_ENCODING => "",
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_CUSTOMREQUEST => "GET",
-            CURLOPT_HTTPHEADER => array(
-                "cache-control: no-cache",
-            ),
-        ));
-
-        $response = curl_exec($curl);
-        $err = curl_error($curl);
-
-        curl_close($curl);
-
-        if ($err) {
-            $this->error = $err;
-        } else {
-            return $response;
-        }
-    }
-
-    public function getError()
-    {
-        return $this->error;
-    }
-
-    public function getAPI()
-    {
-        return $this->api;
-    }
-
-    public function ClearAPI() {
-        $this->api = 'https://api.vk.com/method/';
         return $this;
+    }
+
+    public function execute($returnObject = true, $params=['version' => '5.74'])
+    {
+        $this->query .= '&'.$this->setVersion($params['version']).'&access_token='.$this->token;
+        return $this->request($returnObject);
+    }
+
+    public function getQuery()
+    {
+        return $this->query;
+    }
+
+    protected function request($returnObject = true)
+    {
+        $client = new Client();
+        $res = $client->request('GET', $this->query)->getBody()->getContents();
+
+        return $returnObject ? json_decode($res) : $res;
     }
 
 }
